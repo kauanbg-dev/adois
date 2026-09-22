@@ -1,0 +1,13 @@
+{
+  "name": "adois",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "dev": "node scripts/serve.mjs",
+    "test": "node scripts/casal.test.mjs"
+  }
+}

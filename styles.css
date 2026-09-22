@@ -481,15 +481,25 @@ legend {
 }
 
 @media (min-width: 760px) {
-  body { padding: 28px 0; }
   .phone {
-    min-height: calc(100dvh - 56px);
-    background: rgba(255, 250, 243, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 28px;
-    box-shadow: var(--shadow);
+    width: 100%;
+    min-height: 100dvh;
+    padding: 32px max(32px, 4vw) var(--nav-h);
   }
-  .nav { border-radius: 0 0 28px 28px; }
+  .phone main { width: min(1180px, 100%); margin: 0 auto; }
+  .welcome { max-width: 460px; margin: 10vh auto; }
+  .nav {
+    left: 0;
+    width: 100%;
+    transform: none;
+  }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cats { grid-template-columns: 1fr 1fr; }
+  #outing-form { max-width: 720px; }
+}
+
+@media (min-width: 1100px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

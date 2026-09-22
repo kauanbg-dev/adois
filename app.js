@@ -20,10 +20,48 @@ import {
   sortByDateDesc,
   summarize,
   todayISO,
-} from "./logic.js?v=11";
+} from "./logic.js?v=12";
 
 const STATE_KEY = "adois:v1";
 const CODE_KEY = "adois:code";
+
+function vaultKey(code) {
+  return `adois:vault:${code}`;
+}
+
+function rememberAccount(code) {
+  if (!code) return;
+  localStorage.setItem(vaultKey(code), JSON.stringify(state));
+}
+
+function accountFromVault(code) {
+  try {
+    const raw = localStorage.getItem(vaultKey(code));
+    if (!raw) return emptyState();
+    return sanitizeState(JSON.parse(raw));
+  } catch {
+    return emptyState();
+  }
+}
+
+function logout() {
+  rev += 1;
+  rememberAccount(codeOf());
+  localStorage.removeItem(CODE_KEY);
+  state = emptyState();
+  writeLocal();
+  ui.view = "codigo";
+  ui.error = "";
+  ui.flash = "";
+  ui.confirm = null;
+  ui.draft = null;
+  ui.search = "";
+  ui.codeDraft = "";
+  ui.sync = "local";
+  ui.persistent = null;
+  history.replaceState(null, "", "#");
+  render();
+}
 let installEvent = null;
 
 const app = document.getElementById("app");
@@ -343,6 +381,11 @@ async function onCode(form) {
     render();
     return;
   }
+  const previous = codeOf();
+  if (previous && previous !== code) rememberAccount(previous);
+  rev += 1;
+  state = accountFromVault(code);
+  writeLocal();
   localStorage.setItem(CODE_KEY, code);
   ui.codeDraft = "";
   ui.error = "";
@@ -449,9 +492,16 @@ function onSaveSettings(form) {
     render();
     return;
   }
+  const prev = codeOf();
+  const next = rawCode ? normalizeCode(rawCode) : "";
+  if (next !== prev) {
+    rememberAccount(prev);
+    rev += 1;
+    state = next ? accountFromVault(next) : emptyState();
+  }
   state.names = { a, b };
   state.metaUpdatedAt = new Date().toISOString();
-  if (rawCode) localStorage.setItem(CODE_KEY, normalizeCode(rawCode));
+  if (next) localStorage.setItem(CODE_KEY, next);
   else localStorage.removeItem(CODE_KEY);
   ui.error = "";
   save();
@@ -755,6 +805,13 @@ function renderAjustes() {
         : ""
     }
     <p class="hint">iPhone: Safari, botão Compartilhar, Adicionar à Tela de Início. Android: Chrome, menu de três pontos, Instalar app.</p>
+    <h2 class="section-title">Conta</h2>
+    <p class="lede">Sair esquece o código neste aparelho para entrar com outro.</p>
+    ${
+      ui.confirm?.kind === "logout"
+        ? confirmBox()
+        : `<button class="danger" type="button" data-action="ask-delete" data-kind="logout" data-id="code">Sair da conta</button>`
+    }
     <h2 class="section-title">O que fica anotado</h2>
     <p class="lede">Cada gasto entra no total de quem pagou na saída.</p>
     ${
@@ -771,11 +828,13 @@ function confirmBox() {
   const copy = {
     outing: "Apagar essa saída? Os gastos saem da conta dos dois, se o código estiver ligado.",
     wipe: "Zerar tudo? Nomes e código ficam. As saídas somem nos dois celulares.",
+    logout: "Sair desta conta neste aparelho? O código sai daqui. As saídas continuam para quem entrar de novo com ele.",
   }[ui.confirm.kind];
+  const confirmLabel = ui.confirm.kind === "logout" ? "Sair" : "Apagar";
   return `<div class="confirm">
     <p>${copy}</p>
     <div class="actions">
-      <button class="danger" type="button" data-action="confirm-delete">Apagar</button>
+      <button class="danger" type="button" data-action="confirm-delete">${confirmLabel}</button>
       <button class="ghost" type="button" data-action="cancel-confirm">Cancelar</button>
     </div>
   </div>`;
@@ -890,6 +949,10 @@ app.addEventListener("click", (event) => {
     if (!pending) return;
     if (pending.kind === "wipe") {
       wipe();
+      return;
+    }
+    if (pending.kind === "logout") {
+      logout();
       return;
     }
     if (pending.kind === "outing") {

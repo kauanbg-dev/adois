@@ -2,6 +2,8 @@
 
 Caderno compartilhado de um casal: o dia, o que fizeram e quem pagou. Ninguém “deve” ninguém pelo app — é só registro.
 
+**Ao vivo:** [adois-chi.vercel.app](https://adois-chi.vercel.app/)
+
 ## Funcionalidades
 
 - Registro de saídas com data, descrição e quem pagou

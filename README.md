@@ -7,6 +7,9 @@ Caderno compartilhado de um casal: o dia, o que fizeram e quem pagou. Ninguém �
 ## Funcionalidades
 
 - Registro de saídas com data, descrição e quem pagou
+- Mês com a divisão visual de quem pagou e a diferença para o mês anterior
+- Caderno filtrado por mês ou por pessoa, com sugestão das saídas recentes
+- Repetir uma saída no dia de hoje
 - Código do casal para juntar dois celulares na mesma conta
 - Funciona como PWA (instalável no celular)
 - Em produção, sync via Redis (Vercel KV / Upstash)

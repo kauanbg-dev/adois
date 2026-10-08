@@ -20,7 +20,7 @@ import {
   sortByDateDesc,
   summarize,
   todayISO,
-} from "./logic.js?v=12";
+} from "./logic.js?v=13";
 
 const STATE_KEY = "adois:v1";
 const CODE_KEY = "adois:code";
@@ -57,6 +57,7 @@ function logout() {
   ui.draft = null;
   ui.search = "";
   ui.codeDraft = "";
+  ui.listFilter = "all";
   ui.sync = "local";
   ui.persistent = null;
   history.replaceState(null, "", "#");
@@ -81,6 +82,7 @@ let ui = {
   persistent: null,
   search: "",
   codeDraft: "",
+  listFilter: "all",
 };
 
 function loadState() {
@@ -142,6 +144,116 @@ function payerSummary(outing) {
 
 function pluralSaidas(count) {
   return count === 1 ? "1 saída" : `${count} saídas`;
+}
+
+function monthName(ym) {
+  return formatMonth(ym).replace(/ de \d{4}$/, "");
+}
+
+function deltaLine(current, previous, month) {
+  if (!previous.outingCount) return "";
+  const name = monthName(month);
+  const diff = current.totalCents - previous.totalCents;
+  if (!diff) return `Igual a ${name}.`;
+  const amount = formatBRL(Math.abs(diff));
+  return diff > 0 ? `${amount} a mais que ${name}.` : `${amount} a menos que ${name}.`;
+}
+
+function shareBar(summary) {
+  const sum = summary.paidA + summary.paidB;
+  if (!sum) return "";
+  const widthA = (summary.paidA / sum) * 100;
+  const label = `${nameOf("a")} ${formatBRL(summary.paidA)}, ${nameOf("b")} ${formatBRL(summary.paidB)}`;
+  return `<div class="share" role="img" aria-label="${esc(label)}">
+    <span class="share-a" style="width:${widthA}%"></span>
+    <span class="share-b" style="width:${100 - widthA}%"></span>
+  </div>`;
+}
+
+function recentField(key) {
+  const seen = new Set();
+  const values = [];
+  for (const outing of sortByDateDesc(state.outings)) {
+    const value = String(outing[key] || "").trim();
+    const norm = value.toLocaleLowerCase("pt-BR");
+    if (!value || seen.has(norm)) continue;
+    seen.add(norm);
+    values.push(value);
+    if (values.length === 5) break;
+  }
+  return values;
+}
+
+function chips(field, values) {
+  if (!values.length) return "";
+  return `<div class="chips">${values
+    .map(
+      (value) =>
+        `<button class="chip" type="button" data-action="fill" data-field="${field}" data-value="${esc(value)}">${esc(value)}</button>`,
+    )
+    .join("")}</div>`;
+}
+
+function matchesQuery(outing, query) {
+  if (!query) return true;
+  const blob = [outing.title, outing.place, outing.note, ...outing.expenses.map((expense) => expense.label)]
+    .join(" ")
+    .toLocaleLowerCase("pt-BR");
+  return blob.includes(query);
+}
+
+function matchesFilter(outing) {
+  if (ui.listFilter === "month") return outing.date.startsWith(monthKey(new Date()));
+  if (ui.listFilter === "a" || ui.listFilter === "b") {
+    return outing.expenses.some((expense) => expense.paidBy === ui.listFilter || expense.paidBy === "split");
+  }
+  return true;
+}
+
+function visibleOutings() {
+  const query = ui.search.trim().toLocaleLowerCase("pt-BR");
+  return sortByDateDesc(state.outings).filter((outing) => matchesQuery(outing, query) && matchesFilter(outing));
+}
+
+function emptyNotebook() {
+  if (ui.search.trim()) {
+    return `<section class="empty"><h2>Nada com esse texto.</h2><p class="lede">Tenta outra palavra.</p></section>`;
+  }
+  if (ui.listFilter === "month") {
+    return `<section class="empty"><h2>Nada neste mês.</h2><p class="lede">As outras saídas continuam em Todas.</p></section>`;
+  }
+  if (ui.listFilter === "a" || ui.listFilter === "b") {
+    return `<section class="empty"><h2>Nada pago por ${esc(nameOf(ui.listFilter))}.</h2><p class="lede">Metade cada entra nos dois.</p></section>`;
+  }
+  return `<section class="empty"><h2>O caderno ainda está em branco.</h2><p class="lede">A primeira saída começa pelo botão Nova.</p></section>`;
+}
+
+function notebookHtml(items) {
+  if (!items.length) return emptyNotebook();
+  const groups = [];
+  for (const outing of items) {
+    const key = outing.date.slice(0, 7);
+    let group = groups[groups.length - 1];
+    if (!group || group.key !== key) {
+      group = { key, items: [], cents: 0 };
+      groups.push(group);
+    }
+    group.items.push(outing);
+    group.cents += outingTotal(outing);
+  }
+  return groups
+    .map(
+      (group) => `<section class="month-group">
+        <div class="month-head"><h2>${esc(formatMonth(group.key))}</h2><span>${esc(formatBRL(group.cents))}</span></div>
+        <div class="cards">${group.items.map(outingCard).join("")}</div>
+      </section>`,
+    )
+    .join("");
+}
+
+function filterBtn(id, label) {
+  const on = (ui.listFilter || "all") === id;
+  return `<button type="button" class="chip" data-action="filter" data-filter="${id}" aria-pressed="${on}">${esc(label)}</button>`;
 }
 
 function syncLabel() {
@@ -572,7 +684,7 @@ function nav(current) {
 function shell(title, body, current) {
   return `<div class="phone">
     <header class="top">
-      <p class="brand">a dois</p>
+      <a class="brand" href="#/">a dois</a>
       <p class="sync" data-sync-label data-state="${esc(ui.sync)}">${esc(syncLabel())}</p>
     </header>
     <main>
@@ -605,7 +717,7 @@ function expenseFields(expense) {
 function renderCode() {
   app.innerHTML = `<div class="phone">
     <main class="welcome stack">
-      <p class="brand">a dois</p>
+      <a class="brand" href="#/">a dois</a>
       <h1 tabindex="-1">Código do casal</h1>
       <p class="lede">Os dois celulares entram com o mesmo código. Nesta primeira vez ele fica salvo neste aparelho.</p>
       ${ui.error ? `<p class="error" role="alert">${esc(ui.error)}</p>` : ""}
@@ -622,7 +734,7 @@ function renderCode() {
 function renderWelcome() {
   app.innerHTML = `<div class="phone">
     <main class="welcome stack">
-      <p class="brand">a dois</p>
+      <a class="brand" href="#/">a dois</a>
       <h1 tabindex="-1">O que vocês fizeram e quem pagou.</h1>
       <p class="lede">Anota o dia, a saída e cada gasto. O mês mostra o total e quem pagou.</p>
       ${ui.error ? `<p class="error" role="alert">${esc(ui.error)}</p>` : ""}
@@ -641,12 +753,14 @@ function renderResumo() {
   const current = monthKey(new Date());
   const recent = sortByDateDesc(state.outings.filter((item) => item.date.startsWith(ui.month))).slice(0, 3);
   const average = summary.outingCount ? Math.round(summary.totalCents / summary.outingCount) : 0;
+  const previous = summarize(state, shiftMonth(ui.month, -1));
+  const compared = deltaLine(summary, previous, shiftMonth(ui.month, -1));
   const cats = summary.byCat
     .map((cat) => {
       const pct = summary.totalCents ? Math.max(4, Math.round((cat.cents / summary.totalCents) * 100)) : 0;
       return `<div class="cat">
         <div class="cat-top"><span>${esc(categoryLabel(cat.id))}</span><span>${esc(formatBRL(cat.cents))}</span></div>
-        <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="track"><div class="fill" data-cat="${esc(cat.id)}" style="width:${pct}%"></div></div>
       </div>`;
     })
     .join("");
@@ -657,23 +771,26 @@ function renderResumo() {
       <h1 tabindex="-1">${esc(formatMonth(ui.month))}</h1>
       <button class="icon-btn" type="button" data-action="month" data-dir="1" aria-label="Próximo mês"${ui.month >= current ? " disabled" : ""}>›</button>
     </div>
+    ${ui.month === current ? "" : `<p class="month-jump"><button class="text-btn" type="button" data-action="month-today">Voltar para este mês</button></p>`}
     ${summary.outingCount ? `<p class="total">${esc(formatBRL(summary.totalCents))}</p>` : ""}
     ${
       summary.outingCount
         ? `<p class="stats">${esc(pluralSaidas(summary.outingCount))}${summary.totalCents ? ` · média ${esc(formatBRL(average))}` : ""}</p>`
         : ""
     }
+    ${compared ? `<p class="delta">${esc(compared)}</p>` : ""}
     ${
       summary.outingCount === 0
         ? `<section class="empty">
             <h2>Nenhuma saída em ${esc(formatMonth(ui.month))}.</h2>
             <p class="lede">Quando vocês saírem, anota o que fizeram e quem pagou.</p>
-            <a class="primary" href="#/nova" style="display:inline-block;text-decoration:none;text-align:center">Nova saída</a>
+            <a class="primary" href="#/nova">Nova saída</a>
           </section>`
         : `<div class="pair">
             <article class="who who-a"><h2>${esc(nameOf("a"))}</h2><p class="money">${esc(formatBRL(summary.paidA))}</p><p>pagou nas saídas</p></article>
             <article class="who who-b"><h2>${esc(nameOf("b"))}</h2><p class="money">${esc(formatBRL(summary.paidB))}</p><p>pagou nas saídas</p></article>
-          </div>`
+          </div>
+          ${shareBar(summary)}`
     }
     ${cats ? `<h2 class="section-title">Por tipo</h2><div class="cats">${cats}</div>` : ""}
     ${cards ? `<h2 class="section-title">Neste mês</h2><div class="cards">${cards}</div><p><a href="#/saidas">Ver o caderno inteiro</a></p>` : ""}
@@ -692,21 +809,15 @@ function outingCard(outing) {
 }
 
 function renderSaidas() {
-  const query = ui.search.trim().toLowerCase();
-  const items = sortByDateDesc(state.outings).filter((outing) => {
-    if (!query) return true;
-    const blob = [outing.title, outing.place, outing.note, ...outing.expenses.map((expense) => expense.label)]
-      .join(" ")
-      .toLowerCase();
-    return blob.includes(query);
-  });
   const body = `
+    <div class="filters" role="group" aria-label="Filtrar saídas">
+      ${filterBtn("all", "Todas")}
+      ${filterBtn("month", "Este mês")}
+      ${filterBtn("a", nameOf("a"))}
+      ${filterBtn("b", nameOf("b"))}
+    </div>
     <input class="search" id="search" type="search" placeholder="Buscar saída ou gasto" value="${esc(ui.search)}">
-    ${
-      items.length
-        ? `<div class="cards" id="outing-list">${items.map(outingCard).join("")}</div>`
-        : `<section class="empty"><h2>${query ? "Nada com esse texto." : "O caderno ainda está em branco."}</h2><p class="lede">${query ? "Tenta outra palavra." : "A primeira saída começa pelo botão Nova."}</p></section>`
-    }
+    <div id="notebook">${notebookHtml(visibleOutings())}</div>
   `;
   app.innerHTML = shell("Saídas", body, "saidas");
   const search = document.getElementById("search");
@@ -728,7 +839,9 @@ function renderForm() {
   const body = `<form id="outing-form" class="stack" autocomplete="off">
     ${dateFieldHtml(dateSource(draft))}
     <label class="field">O que vocês fizeram<input name="title" maxlength="80" required value="${esc(draft.title)}" placeholder="Jantar, cinema, mercado"></label>
+    ${chips("title", recentField("title"))}
     <label class="field">Onde<input name="place" maxlength="80" value="${esc(draft.place)}" placeholder="Bairro, restaurante, casa"></label>
+    ${chips("place", recentField("place"))}
     <label class="field">Nota<textarea name="note" maxlength="400" placeholder="O que ficou da noite">${esc(draft.note)}</textarea></label>
     <h2 class="section-title">Gastos</h2>
     ${draft.expenses.map(expenseFields).join("")}
@@ -750,7 +863,7 @@ function renderDetalhe() {
   const when = formatDayParts(outing.date);
   const lines = outing.expenses
     .map(
-      (expense) => `<li class="expense">
+      (expense) => `<li class="expense" data-cat="${esc(expense.category)}">
         <div><strong>${esc(expense.label)}</strong><span class="sub">${esc(categoryLabel(expense.category))} · ${esc(payerLabel(expense.paidBy))}</span></div>
         <b>${esc(formatBRL(expense.amountCents))}</b>
       </li>`,
@@ -764,7 +877,8 @@ function renderDetalhe() {
     ${lines ? `<ul class="expense-list">${lines}</ul>` : `<p class="lede">Sem gastos nesta saída.</p>`}
     <p class="form-total"><span>Total</span><strong>${esc(formatBRL(outingTotal(outing)))}</strong></p>
     <div class="actions">
-      <a class="ghost" href="#/editar/${esc(outing.id)}" style="text-decoration:none">Editar</a>
+      <a class="ghost" href="#/editar/${esc(outing.id)}">Editar</a>
+      <button class="ghost" type="button" data-action="repeat" data-id="${esc(outing.id)}">Repetir hoje</button>
       <button class="danger" type="button" data-action="ask-delete" data-kind="outing" data-id="${esc(outing.id)}">Apagar</button>
     </div>
     ${asking ? confirmBox() : ""}
@@ -868,36 +982,8 @@ app.addEventListener("submit", (event) => {
 app.addEventListener("input", (event) => {
   if (event.target.id === "search") {
     ui.search = event.target.value;
-    const items = sortByDateDesc(state.outings).filter((outing) => {
-      const query = ui.search.trim().toLowerCase();
-      if (!query) return true;
-      const blob = [outing.title, outing.place, outing.note, ...outing.expenses.map((expense) => expense.label)]
-        .join(" ")
-        .toLowerCase();
-      return blob.includes(query);
-    });
-    const list = document.getElementById("outing-list");
-    const empty = app.querySelector(".empty");
-    if (!items.length) {
-      if (list) list.remove();
-      if (!empty) {
-        const section = document.createElement("section");
-        section.className = "empty";
-        section.innerHTML = "<h2>Nada com esse texto.</h2><p class=\"lede\">Tenta outra palavra.</p>";
-        event.target.after(section);
-      }
-      return;
-    }
-    if (empty) empty.remove();
-    const html = items.map(outingCard).join("");
-    if (list) list.innerHTML = html;
-    else {
-      const wrap = document.createElement("div");
-      wrap.className = "cards";
-      wrap.id = "outing-list";
-      wrap.innerHTML = html;
-      event.target.after(wrap);
-    }
+    const box = document.getElementById("notebook");
+    if (box) box.innerHTML = notebookHtml(visibleOutings());
     return;
   }
   if (event.target.closest("#outing-form")) updateFormTotal();
@@ -915,6 +1001,42 @@ app.addEventListener("click", (event) => {
     ui.month = shiftMonth(ui.month, Number(button.dataset.dir));
     ui.confirm = null;
     render();
+    return;
+  }
+  if (action === "month-today") {
+    ui.month = monthKey(new Date());
+    render();
+    return;
+  }
+  if (action === "filter") {
+    ui.listFilter = button.dataset.filter || "all";
+    render();
+    const search = document.getElementById("search");
+    if (search && ui.search) {
+      search.focus();
+      const end = search.value.length;
+      search.setSelectionRange(end, end);
+    }
+    return;
+  }
+  if (action === "fill") {
+    const form = document.getElementById("outing-form");
+    const input = form?.querySelector(`[name="${button.dataset.field}"]`);
+    if (!form || !input) return;
+    input.value = button.dataset.value || "";
+    ui.draft = readOutingForm(form);
+    ui.draft.forId = ui.editingId || null;
+    input.focus();
+    return;
+  }
+  if (action === "repeat") {
+    const outing = state.outings.find((item) => item.id === button.dataset.id);
+    if (!outing) return;
+    ui.draft = draftFromOuting(outing);
+    ui.draft.forId = null;
+    ui.draft.date = todayISO();
+    ui.editingId = null;
+    go("#/nova");
     return;
   }
   if (action === "add-expense") {

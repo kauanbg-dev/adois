@@ -1,10 +1,10 @@
-const CACHE = "adois-v12";
+const CACHE = "adois-v13";
 const SHELL = [
   "/",
   "/index.html",
-  "/app.js?v=12",
-  "/logic.js?v=12",
-  "/styles.css?v=12",
+  "/app.js?v=13",
+  "/logic.js?v=13",
+  "/styles.css?v=13",
   "/manifest.webmanifest",
   "/icon.svg",
   "/icon-180.png",

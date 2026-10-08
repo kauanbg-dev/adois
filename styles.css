@@ -67,6 +67,7 @@ h1, h2, .brand, .money, .total, .day b {
   margin: 0;
   font-size: 1.35rem;
   letter-spacing: -0.03em;
+  text-decoration: none;
 }
 
 .sync {
@@ -207,6 +208,22 @@ form .primary { width: 100%; }
 .who-a { background: var(--a-soft); }
 .who-b { background: var(--b-soft); }
 
+.share {
+  display: flex;
+  height: 10px;
+  margin: 12px 0 2px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(28, 22, 18, 0.08);
+}
+
+.share-a, .share-b { height: 100%; }
+.share-a { background: var(--a); }
+.share-b { background: var(--b); }
+
+.delta { margin: -4px 0 16px; color: var(--muted); }
+.month-jump { margin: 0 0 6px; }
+
 .balance {
   margin-top: 14px;
   padding: 16px;
@@ -249,7 +266,15 @@ form .primary { width: 100%; }
   overflow: hidden;
 }
 
-.fill { height: 100%; background: var(--ink); border-radius: inherit; }
+.fill { height: 100%; background: var(--cat, var(--ink)); border-radius: inherit; }
+
+[data-cat="comida"] { --cat: #c4552a; }
+[data-cat="transporte"] { --cat: #1f6a62; }
+[data-cat="ingresso"] { --cat: #8a4b78; }
+[data-cat="presente"] { --cat: #b5812f; }
+[data-cat="mercado"] { --cat: #3d6b3a; }
+[data-cat="casa"] { --cat: #6d5346; }
+[data-cat="outro"] { --cat: #6f645b; }
 
 .section-title {
   margin: 22px 0 10px;
@@ -327,6 +352,15 @@ form .primary { width: 100%; }
 .expense {
   align-items: flex-start;
   padding: 14px;
+}
+
+.expense::before {
+  content: "";
+  width: 4px;
+  align-self: stretch;
+  flex: none;
+  border-radius: 99px;
+  background: var(--cat, var(--ink));
 }
 
 .expense .sub { display: block; }
@@ -459,7 +493,58 @@ form .primary { width: 100%; }
   padding: 4px 0;
 }
 
-.nav a[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.nav a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 2px 0 12px;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: #f6efe4;
+  border-color: var(--ink);
+}
+
+.month-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 4px 0 10px;
+}
+
+.month-head h2 { margin: 0; font-size: 1.15rem; }
+.month-head span { color: var(--muted); font-size: 0.92rem; }
+.month-group + .month-group { margin-top: 18px; }
+
+.welcome form {
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255, 250, 243, 0.82);
+  box-shadow: var(--shadow);
+}
+
+.empty .primary { margin-top: 6px; }
 
 .nav svg { width: 22px; height: 22px; }
 
